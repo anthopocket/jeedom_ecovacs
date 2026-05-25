@@ -1,0 +1,29 @@
+{
+	"id": "ecovacs",
+	"name": "Ecovacs",
+	"pluginVersion": "1.0.0",
+	"description": {
+		"fr_FR": "Plugin pour aspirateurs robots Ecovacs (T30C, T20, X2 et modèles MQTT). Démon temps réel, création automatique des commandes.",
+		"en_US": "Plugin for Ecovacs robot vacuums (T30C, T20, X2 and MQTT models). Real-time daemon, automatic command creation."
+	},
+	"licence": "AGPL",
+	"author": "Plugin Ecovacs",
+	"require": "4.2",
+	"category": "devicecommunication",
+	"hasDependency": true,
+	"hasOwnDeamon": true,
+	"maxDependancyInstallTime": 10,
+	"changelog": "https://github.com/",
+	"documentation": "https://github.com/",
+	"compatibility": [
+		"rpi",
+		"docker",
+		"diy",
+		"luna",
+		"atlas"
+	],
+	"language": [
+		"fr_FR",
+		"en_US"
+	]
+}
