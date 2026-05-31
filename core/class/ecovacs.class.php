@@ -139,7 +139,7 @@ class ecovacs extends eqLogic {
 				$eqLogic->checkAndUpdateInfoCmd('battery', isset($_params['value']) ? $_params['value'] : 0);
 				return;
 			case 'state':
-				$eqLogic->checkAndUpdateInfoCmd('state', isset($_params['state']) ? $_params['state'] : '');
+				$eqLogic->checkAndUpdateInfoCmd('state', self::translate(isset($_params['state']) ? $_params['state'] : ''));
 				return;
 			case 'fan_speed':
 				$eqLogic->checkAndUpdateInfoCmd('fan_speed', strtolower(isset($_params['speed']) ? $_params['speed'] : ''));
@@ -161,17 +161,21 @@ class ecovacs extends eqLogic {
 				return;
 			case 'stats':
 				$eqLogic->checkAndUpdateInfoCmd('stats_area',     isset($_params['area'])     ? $_params['area']     : 0);
-				$eqLogic->checkAndUpdateInfoCmd('stats_duration', isset($_params['duration']) ? $_params['duration'] : 0);
-				$eqLogic->checkAndUpdateInfoCmd('stats_mode',     isset($_params['mode'])     ? $_params['mode']     : '');
+				$eqLogic->checkAndUpdateInfoCmd('stats_duration', isset($_params['duration']) ? round($_params['duration'] / 60, 1) : 0);
+				$eqLogic->checkAndUpdateInfoCmd('stats_mode', self::translate(isset($_params['mode']) ? $_params['mode'] : ''));
 				return;
 			case 'total_stats':
 				$eqLogic->checkAndUpdateInfoCmd('total_area',      isset($_params['area'])      ? $_params['area']      : 0);
-				$eqLogic->checkAndUpdateInfoCmd('total_time',      isset($_params['time'])      ? $_params['time']      : 0);
+				$eqLogic->checkAndUpdateInfoCmd('total_time',      isset($_params['time'])      ? round($_params['time'] / 3600, 1) : 0);
 				$eqLogic->checkAndUpdateInfoCmd('total_cleanings', isset($_params['cleanings']) ? $_params['cleanings'] : 0);
 				return;
 			case 'error':
-				$eqLogic->checkAndUpdateInfoCmd('error_code', isset($_params['code'])        ? $_params['code']        : 0);
-				$eqLogic->checkAndUpdateInfoCmd('error_desc', isset($_params['description']) ? $_params['description'] : '');
+				$code = isset($_params['code']) ? intval($_params['code']) : 0;
+				$desc = isset(self::$ERROR_CODES[$code])
+					? self::$ERROR_CODES[$code]
+					: (isset($_params['description']) ? $_params['description'] : '');
+				$eqLogic->checkAndUpdateInfoCmd('error_code', $code);
+				$eqLogic->checkAndUpdateInfoCmd('error_desc', $desc);
 				return;
 			case 'lifespan':
 				$component = strtolower(isset($_params['component']) ? $_params['component'] : '');
@@ -217,7 +221,7 @@ class ecovacs extends eqLogic {
 				return;
 			case 'charge_state':
 				$eqLogic->checkAndUpdateInfoCmd('is_charging', isset($_params['is_charging']) ? $_params['is_charging'] : 0);
-				$eqLogic->checkAndUpdateInfoCmd('charge_mode', isset($_params['mode'])        ? $_params['mode']        : '');
+				$eqLogic->checkAndUpdateInfoCmd('charge_mode', self::translate(isset($_params['mode']) ? $_params['mode'] : ''));
 				return;
 			case 'water_info_full':
 				$eqLogic->checkAndUpdateInfoCmd('water_amount', isset($_params['custom_amount']) ? $_params['custom_amount'] : 0);
@@ -233,22 +237,127 @@ class ecovacs extends eqLogic {
 				$eqLogic->checkAndUpdateInfoCmd('battery_temperature', isset($_params['temperature']) ? $_params['temperature'] : 0);
 				return;
 			case 'work_state':
-				$eqLogic->checkAndUpdateInfoCmd('state',         isset($_params['robot_state'])   ? $_params['robot_state']   : '');
-				$eqLogic->checkAndUpdateInfoCmd('station_state', isset($_params['station_state']) ? $_params['station_state'] : '');
+				$eqLogic->checkAndUpdateInfoCmd('state', self::translate(isset($_params['robot_state']) ? $_params['robot_state'] : ''));
+				$eqLogic->checkAndUpdateInfoCmd('station_state', self::translate(isset($_params['station_state']) ? $_params['station_state'] : ''));
 				return;
 
 			case 'work_progress':
-				$eqLogic->checkAndUpdateInfoCmd('station_cleaning', isset($_params['clean']) ? $_params['clean'] : 0);
-				$eqLogic->checkAndUpdateInfoCmd('station_drying',   isset($_params['dry'])   ? $_params['dry']   : 0);
-				$eqLogic->checkAndUpdateInfoCmd('station_washing',  isset($_params['wash'])  ? $_params['wash']  : 0);
+				// clean/dry/wash sont des pourcentages 0-100
+				$eqLogic->checkAndUpdateInfoCmd('station_cleaning', isset($_params['clean']) ? intval($_params['clean']) : 0);
+				$eqLogic->checkAndUpdateInfoCmd('station_drying',   isset($_params['dry'])   ? intval($_params['dry'])   : 0);
+				$eqLogic->checkAndUpdateInfoCmd('station_washing',  isset($_params['wash'])  ? intval($_params['wash'])  : 0);
 				return;
 			case 'station_state_raw':
-				$eqLogic->checkAndUpdateInfoCmd('station_state', isset($_params['state']) ? $_params['state'] : '');
+				$eqLogic->checkAndUpdateInfoCmd('station_state', self::translate(isset($_params['state']) ? $_params['state'] : ''));
+				$eqLogic->checkAndUpdateInfoCmd('dirty_water_full', isset($_params['dirty_water_full']) ? intval($_params['dirty_water_full']) : 0);
 				return;
 			default:
 				log::add('ecovacs', 'debug', "Type callback non gere : {$type}");
 				return;
 		}
+	}
+
+	// Traductions des valeurs
+	private static $ERROR_CODES = array(
+		0    => 'Aucune erreur',
+		100  => 'Aucune erreur',
+		101  => 'Batterie faible',
+		102  => 'Robot soulevé',
+		103  => 'Roue motrice bloquée',
+		104  => 'Capteurs anti-chute encrassés',
+		105  => 'Robot coincé',
+		106  => 'Brosse latérale usée',
+		107  => 'Filtre poussière usé',
+		108  => 'Brosse latérale emmêlée',
+		109  => 'Brosse principale emmêlée',
+		110  => 'Bac à poussière non installé',
+		111  => 'Capteur de choc bloqué',
+		112  => 'Capteur laser défaillant',
+		113  => 'Brosse principale usée',
+		114  => 'Bac à poussière plein',
+		115  => 'Erreur batterie',
+		118  => 'Filtre bloqué',
+		119  => 'Erreur ventilateur',
+		120  => 'Erreur bac eau',
+		121  => 'Serpillière bloquée',
+		125  => 'Réservoir défaillant',
+		126  => 'Réservoir non installé',
+		128  => 'Serpillières non installées',
+		129  => 'Serpillière emmêlée',
+		201  => 'Filtre à air non installé',
+		203  => 'Petite roue bloquée',
+		204  => 'Roue suspendue',
+		209  => 'Capteur ToF défaillant',
+		301  => 'Réservoir eau propre vide',
+		302  => 'Bac eaux usées plein',
+		303  => 'Réservoir eau propre absent',
+		304  => 'Bac eaux usées absent',
+		305  => 'Bac eau sale plein',
+		306  => 'Filtre station non installé',
+		307  => 'Station de nettoyage défaillante',
+		308  => 'Problème de communication',
+		310  => 'Couvercle ouvert',
+		311  => 'Remplacer le sac à poussière',
+		312  => 'Sac à poussière plein',
+		314  => 'Module eau non installé',
+		315  => 'Module eau non installé',
+		316  => 'Soie de nettoyage pleine',
+		317  => 'Problème remplissage eau propre',
+		318  => 'Bac eau sale plein',
+		319  => 'Solution nettoyante presque vide',
+		322  => 'Réservoir eau propre vide ou absent',
+		323  => 'Bac eau sale plein ou absent',
+		1007 => 'Serpillière bouchée',
+		1021 => 'Nettoyage terminé',
+		1024 => 'Batterie faible, retour base',
+		1052 => 'Remplacer la serpillière',
+		1053 => 'Tâche interrompue, retour base',
+		1094 => 'Séchage serpillière en cours',
+		2036 => 'Obstacle détecté',
+	);
+
+	private static $TRANSLATIONS = array(
+		// États robot
+		'docked'    => 'En base',
+		'cleaning'  => 'Nettoyage',
+		'returning' => 'Retour base',
+		'paused'    => 'En pause',
+		'idle'      => 'Inactif',
+		'error'     => 'Erreur',
+		'sleeping'  => 'Veille',
+		// États station
+		'emptying'  => 'Vidage bac',
+		'washing'   => 'Lavage serpillière',
+		'drying'    => 'Séchage serpillière',
+		// Puissance
+		'quiet'     => 'Silencieux',
+		'normal'    => 'Normal',
+		'max'       => 'Maximum',
+		'max_plus'  => 'Maximum+',
+		// Mode travail
+		'vacuum'           => 'Aspiration',
+		'mop'              => 'Serpillière',
+		'vacuum_and_mop'   => 'Aspiration + Serpillière',
+		'mop_after_vacuum' => 'Serpillière après aspiration',
+		// Type balayage
+		'standard'  => 'Standard',
+		'deep'      => 'Profond',
+		// Mode charge
+		'slot'      => 'Sur base',
+		// Erreurs
+		'NoError: Robot is operational' => 'Aucune erreur',
+		'Mopping Pad Plate is tangled'  => 'Serpillière emmêlée',
+		'WheelAbnormal: Driving Wheel malfunction' => 'Roue bloquée',
+		// Mode auto
+		'auto'      => 'Auto',
+	);
+
+	private static function translate($value) {
+		if (!is_string($value)) return $value;
+		$key = strtolower($value);
+		if (isset(self::$TRANSLATIONS[$key])) return self::$TRANSLATIONS[$key];
+		if (isset(self::$TRANSLATIONS[$value])) return self::$TRANSLATIONS[$value];
+		return $value;
 	}
 
 	// Met a jour une commande info existante (ne cree pas)
@@ -286,81 +395,69 @@ class ecovacs extends eqLogic {
 			array('Nettoyer',              'clean',              'action', 'other',   1,  array()),
 			array('Pause',                 'pause',              'action', 'other',   2,  array()),
 			array('Reprendre',             'resume',             'action', 'other',   3,  array()),
-			array('Arreter',               'stop',               'action', 'other',   4,  array()),
-			array('Retour Base',           'charge',             'action', 'other',   5,  array()),
+			array('Arrêter',               'stop',               'action', 'other',   4,  array()),
+			array('Retour base',           'charge',             'action', 'other',   5,  array()),
 			array('Localiser',             'locate',             'action', 'other',   6,  array()),
-			array('Rafraichir',            'refresh',            'action', 'other',   7,  array()),
+			array('Rafraîchir',            'refresh',            'action', 'other',   7,  array()),
 			// ── Actions liste ─────────────────────────────────────────────────
 			array('Puissance aspiration',  'set_fan_speed',      'action', 'select',  10,
 				array('listValue' => 'quiet|Silencieux;normal|Normal;max|Maximum;max_plus|Maximum+', 'value' => 'fan_speed')),
 			array('Mode travail',          'set_work_mode',      'action', 'select',  11,
-				array('listValue' => 'vacuum|Aspiration;mop|Serpillere;vacuum_and_mop|Aspiration+Serpillere;mop_after_vacuum|Serpillere apres aspiration', 'value' => 'work_mode')),
-			array('Niveau eau serpillere', 'set_water_amount',   'action', 'slider',  12,
+				array('listValue' => 'vacuum|Aspiration;mop|Serpillière;vacuum_and_mop|Aspiration+Serpillière;mop_after_vacuum|Serpillière après aspiration', 'value' => 'work_mode')),
+			array('Niveau eau serpillère', 'set_water_amount',   'action', 'slider',  12,
 				array('minValue' => 1, 'maxValue' => 50, 'value' => 'water_amount')),
-			array('Mode lavage serpillere','set_sweep_type',     'action', 'select',  13,
+			array('Mode lavage serpillère','set_sweep_type',     'action', 'select',  13,
 				array('listValue' => 'standard|Standard;deep|Profond')),
-			array('Frequence lavage',      'set_wash_interval',  'action', 'select',  14,
-				array('listValue' => '10|10 min;15|15 min;25|25 min;30|30 min;45|45 min')),
 			// Actions station
 			array('Vider le bac',          'station_empty',      'action', 'other',   15, array()),
-			array('Laver serpilleres',      'station_wash',       'action', 'other',   16, array()),
-			array('Secher serpilleres',     'station_dry',        'action', 'other',   17, array()),
+			array('Laver serpillières',      'station_wash',       'action', 'other',   16, array()),
+			array('Sécher serpillières',     'station_dry',        'action', 'other',   17, array()),
 			array('Nettoyer station',       'station_clean',      'action', 'other',   18, array()),
 			// ── Infos etat ────────────────────────────────────────────────────
 			array('Disponible',            'availability',       'info', 'binary',    20, array()),
 			array('Batterie',              'battery',            'info', 'numeric',   21, array('unite' => '%')),
-			array('Etat',                  'state',              'info', 'string',    22, array()),
+			array('État',                  'state',              'info', 'string',    22, array()),
 			array('Puissance',             'fan_speed',          'info', 'string',    23, array()),
-			array('Mode travail val',      'work_mode',          'info', 'string',    24, array()),
-			array('Serpillere',            'mop_attached',       'info', 'binary',    25, array()),
+			array('Mode travail actuel','work_mode',          'info', 'string',    24, array()),
+			array('Serpillière',            'mop_attached',       'info', 'binary',    25, array()),
 			array('Type balayage',         'sweep_type',         'info', 'string',    26, array()),
 			array('Niveau eau',            'water_amount',       'info', 'numeric',   27, array()),
-			array('Etat station',          'station_state',      'info', 'string',    28, array()),
+			array('État station',          'station_state',      'info', 'string',    28, array()),
 			array('En charge',             'is_charging',        'info', 'binary',    29, array()),
 			array('Mode charge',           'charge_mode',        'info', 'string',    30, array()),
 			// ── Infos session ─────────────────────────────────────────────────
 			array('Surface session',       'stats_area',         'info', 'numeric',   40, array('unite' => 'm2')),
-			array('Duree session',         'stats_duration',     'info', 'numeric',   41, array('unite' => 's')),
-			array('Mode session',          'stats_mode',         'info', 'string',    42, array()),
+			array('Durée session',         'stats_duration',     'info', 'numeric',   41, array('unite' => 'min')),
 			array('Surface totale',        'total_area',         'info', 'numeric',   43, array('unite' => 'm2')),
-			array('Temps total',           'total_time',         'info', 'numeric',   44, array('unite' => 's')),
+			array('Temps total',           'total_time',         'info', 'numeric',   44, array('unite' => 'h')),
 			array('Nettoyages total',      'total_cleanings',    'info', 'numeric',   45, array()),
 			// ── Erreurs ───────────────────────────────────────────────────────
 			array('Code erreur',           'error_code',         'info', 'numeric',   50, array()),
 			array('Description erreur',    'error_desc',         'info', 'string',    51, array()),
 			// ── Consommables ──────────────────────────────────────────────────
 			array('Brosse principale',     'lifespan_brush',             'info', 'numeric', 60, array('unite' => '%')),
-			array('Brosse laterale',       'lifespan_side_brush',        'info', 'numeric', 61, array('unite' => '%')),
+			array('Brosse latérale',       'lifespan_side_brush',        'info', 'numeric', 61, array('unite' => '%')),
 			array('Filtre HEPA',           'lifespan_filter',            'info', 'numeric', 62, array('unite' => '%')),
-			array('Sac a poussiere',       'lifespan_dust_bag',          'info', 'numeric', 63, array('unite' => '%')),
-			array('Serpillere rotative',   'lifespan_round_mop',         'info', 'numeric', 64, array('unite' => '%')),
+			array('Sac à poussière',       'lifespan_dust_bag',          'info', 'numeric', 63, array('unite' => '%')),
+			array('Serpillière rotative',   'lifespan_round_mop',         'info', 'numeric', 64, array('unite' => '%')),
 			array('Entretien station',     'lifespan_unit_care',         'info', 'numeric', 65, array('unite' => '%')),
-			array('Bac eaux usees',        'lifespan_sewage_box',        'info', 'numeric', 66, array('unite' => '%')),
-			array('Reservoir eau',         'lifespan_water_sink',        'info', 'numeric', 67, array('unite' => '%')),
+			array('Bac eaux usées',        'lifespan_sewage_box',        'info', 'numeric', 66, array('unite' => '%')),
+			array('Réservoir eau',         'lifespan_water_sink',        'info', 'numeric', 67, array('unite' => '%')),
 			array('Solution nettoyante',   'lifespan_cleaning_solution', 'info', 'numeric', 68, array('unite' => '%')),
-			array('Filtre tamis',          'lifespan_strainer',          'info', 'numeric', 69, array('unite' => '%')),
-			array('Filtre main',           'lifespan_hand_filter',       'info', 'numeric', 70, array('unite' => '%')),
 			// ── Reseau ────────────────────────────────────────────────────────
 			array('IP',                    'network_ip',         'info', 'string',    80, array()),
 			array('SSID',                  'network_ssid',       'info', 'string',    81, array()),
 			array('Signal WiFi',           'network_rssi',       'info', 'numeric',   82, array()),
 			array('MAC',                   'network_mac',        'info', 'string',    83, array()),
 			// ── Station / lavage ──────────────────────────────────────────────
-			array('Etat station',          'station_state',      'info', 'string',    28, array()),
-			array('Intensite lavage',      'wash_amount',        'info', 'numeric',   90, array()),
-			array('Duree lavage',          'wash_duration',      'info', 'numeric',   91, array('unite' => 's')),
-			array('Intervalle lavage',     'wash_interval',      'info', 'numeric',   92, array('unite' => 'min')),
-			array('Mode lavage',           'wash_mode',          'info', 'numeric',   93, array()),
-			array('Frequence lavage serp', 'mop_wash_frequency', 'info', 'numeric',   94, array('unite' => 'min')),
-			// Station en cours
-			array('Station vidage',        'station_cleaning',  'info', 'binary',    105, array()),
-			array('Station sechage',       'station_drying',    'info', 'binary',    106, array()),
-			array('Station lavage',        'station_washing',   'info', 'binary',    107, array()),
+			// Station en cours (progression 0-100%)
+			array('Station vidage %',      'station_cleaning',  'info', 'numeric',   105, array('unite' => '%')),
+			array('Station séchage %',     'station_drying',    'info', 'numeric',   106, array('unite' => '%')),
+			array('Station lavage %',      'station_washing',   'info', 'numeric',   107, array('unite' => '%')),
+			// Bac eau sale plein (capteur flotteur)
+			array('Bac eau sale plein',    'dirty_water_full',  'info', 'binary',    109, array()),
 			// ── Divers ────────────────────────────────────────────────────────
 			array('Volume',                'volume',             'info', 'numeric',   100, array()),
-			array('Version firmware',      'firmware_version',   'info', 'string',    101, array()),
-			array('Temperature batterie',  'battery_temperature','info', 'numeric',   102, array('unite' => 'C')),
-			array('Tension batterie',      'battery_voltage',    'info', 'numeric',   103, array('unite' => 'mV')),
 		);
 
 		foreach ($defs as $d) {

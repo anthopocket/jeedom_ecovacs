@@ -7,7 +7,7 @@
 		"en_US": "Plugin for Ecovacs robot vacuums (T30C, T20, X2 and MQTT models). Real-time daemon, automatic command creation."
 	},
 	"licence": "AGPL",
-	"author": "Plugin Ecovacs",
+	"author": "anthopocket",
 	"require": "4.2",
 	"category": "devicecommunication",
 	"hasDependency": true,

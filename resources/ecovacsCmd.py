@@ -667,6 +667,9 @@ async def main() -> None:
                 if not body_data or data.get("body", {}).get("code", 0) != 0:
                     return
 
+                # Log tous les messages reçus pour debug
+                logger.debug("EXTRA_HANDLER cmd=%s topic=%s", cmd_name, topic)
+
                 if cmd_name == "getWashInfo":
                     # Données complètes du lavage serpillère
                     fire_fn({"type": "wash_info",
@@ -712,12 +715,32 @@ async def main() -> None:
                     })
 
                 elif cmd_name in ("getStationState", "onStationState"):
-                    # Backup brut si StationEvent ne fonctionne pas
-                    state_map = {0: "idle", 1: "busy"}
-                    state_raw = body_data.get("state", 0)
-                    fire_fn({"type": "station_state_raw",
-                             "state": state_map.get(state_raw, str(state_raw)),
-                             "raw":   state_raw,
+                    state_raw    = body_data.get("state", 0)
+                    content_data = body_data.get("content", {}) or {}
+                    errors       = content_data.get("error", []) or []
+                    station_type = content_data.get("type", 0)
+                    motion       = content_data.get("motionState", 0)
+
+                    # Mapper l'état de la station
+                    if state_raw == 0:
+                        mapped = "idle"
+                    elif station_type == 1 and motion == 1:
+                        mapped = "emptying"
+                    elif station_type == 2 and motion == 1:
+                        mapped = "drying"
+                    elif station_type == 3 and motion == 1:
+                        mapped = "washing"
+                    else:
+                        mapped = "idle"
+
+                    # Code 302 = capteur flotteur bac eau sale déclenché
+                    dirty_water_full = 1 if 302 in errors else 0
+
+                    fire_fn({"type":             "station_state_raw",
+                             "state":            mapped,
+                             "raw":              state_raw,
+                             "errors":           errors,
+                             "dirty_water_full": dirty_water_full,
                     })
 
                 elif cmd_name == "getVolume":
@@ -800,6 +823,36 @@ async def main() -> None:
         socket_server.start()
 
         logger.info("Démon opérationnel – en attente d'événements MQTT…")
+
+        # ── Watchdog MQTT ─────────────────────────────────────────────────────
+        async def mqtt_watchdog():
+            """Vérifie toutes les 5 minutes que MQTT est connecté et rafraîchit."""
+            while not stop_event.is_set():
+                await asyncio.sleep(300)  # 5 minutes
+                if stop_event.is_set():
+                    break
+                try:
+                    # Vérifier si la connexion MQTT est active
+                    if hasattr(mqtt_client, '_client') and mqtt_client._client:
+                        connected = getattr(mqtt_client._client, 'is_connected', lambda: True)()
+                        if not connected:
+                            logger.warning("MQTT déconnecté – tentative de reconnexion…")
+                            try:
+                                await mqtt_client.connect()
+                                logger.info("MQTT reconnecté.")
+                                for device in devices.values():
+                                    asyncio.create_task(refresh_device(device))
+                            except Exception as exc:
+                                logger.error("Échec reconnexion MQTT : %s", exc)
+                        else:
+                            # Rafraîchissement périodique pour garder les données à jour
+                            logger.debug("Watchdog : rafraîchissement périodique")
+                            for device in devices.values():
+                                asyncio.create_task(refresh_device(device))
+                except Exception as exc:
+                    logger.debug("Watchdog error : %s", exc)
+
+        asyncio.create_task(mqtt_watchdog())
         await stop_event.wait()
 
         # ── Arrêt propre ──────────────────────────────────────────────────────
