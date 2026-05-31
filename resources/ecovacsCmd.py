@@ -318,10 +318,20 @@ async def refresh_device(device: Device) -> None:
     """Rafraîchissement initial – ignore les commandes non supportées par le modèle."""
     cmds = list(_REFRESH_COMMANDS)
 
-    # Demander TOUS les types LifeSpan connus, pas seulement ceux déclarés
-    # dans les capabilities du modèle (la lib peut être incomplète)
-    all_lifespans = list(LifeSpan)
-    cmds.append(GetLifeSpan(all_lifespans))
+    # Utiliser uniquement les lifespans déclarés dans les capabilities du modèle
+    # pour éviter les erreurs 20004 sur les composants non supportés
+    if device.capabilities.life_span:
+        supported = list(device.capabilities.life_span.types)
+        if supported:
+            cmds.append(GetLifeSpan(supported))
+    else:
+        # Fallback sur les composants connus du T20/T30
+        known = [
+            LifeSpan.BRUSH, LifeSpan.FILTER, LifeSpan.SIDE_BRUSH,
+            LifeSpan.UNIT_CARE, LifeSpan.ROUND_MOP, LifeSpan.DUST_BAG,
+            LifeSpan.CLEANING_SOLUTION, LifeSpan.SEWAGE_BOX, LifeSpan.WATER_SINK,
+        ]
+        cmds.append(GetLifeSpan(known))
 
     for cmd in cmds:
         try:
@@ -364,7 +374,15 @@ class SocketServer(threading.Thread):
     def run(self) -> None:
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self._sock.bind(("127.0.0.1", self._port))
+        try:
+            self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        except AttributeError:
+            pass  # SO_REUSEPORT non disponible sur certains systèmes
+        try:
+            self._sock.bind(("127.0.0.1", self._port))
+        except OSError as exc:
+            logger.critical("FATAL: Impossible de binder le port %d : %s – arrêt du démon", self._port, exc)
+            os._exit(1)  # Arrêt immédiat du processus entier
         self._sock.listen(10)
         logger.info("Socket Jeedom en écoute sur le port %d", self._port)
         while self._running:
@@ -524,6 +542,16 @@ class SocketServer(threading.Thread):
 # ══════════════════════════════════════════════════════════════════════════════
 #  Main
 # ══════════════════════════════════════════════════════════════════════════════
+
+def _handle_exception(loop, context):
+    """Handler global pour les exceptions asyncio non catchées."""
+    exc = context.get('exception')
+    msg = context.get('message', 'Unknown')
+    if exc:
+        logger.critical("Exception asyncio non catchée: %s", msg, exc_info=exc)
+    else:
+        logger.critical("Erreur asyncio: %s", msg)
+
 
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Démon Jeedom – Ecovacs Deebot (deebot-client >= 18)")
@@ -822,31 +850,11 @@ async def main() -> None:
         )
         socket_server.start()
 
+        # Handler global pour les exceptions asyncio
+        loop.set_exception_handler(_handle_exception)
         logger.info("Démon opérationnel – en attente d'événements MQTT…")
 
-        # ── Watchdog MQTT ─────────────────────────────────────────────────────
-        async def mqtt_watchdog():
-            """Vérifie toutes les 10 minutes que MQTT est connecté."""
-            while not stop_event.is_set():
-                await asyncio.sleep(600)  # 10 minutes
-                if stop_event.is_set():
-                    break
-                try:
-                    if hasattr(mqtt_client, '_client') and mqtt_client._client:
-                        connected = getattr(mqtt_client._client, 'is_connected', lambda: True)()
-                        if not connected:
-                            logger.warning("MQTT déconnecté – tentative de reconnexion…")
-                            try:
-                                await mqtt_client.connect()
-                                logger.info("MQTT reconnecté.")
-                            except Exception as exc:
-                                logger.error("Échec reconnexion MQTT : %s", exc)
-                        else:
-                            logger.debug("Watchdog : MQTT OK")
-                except Exception as exc:
-                    logger.debug("Watchdog error : %s", exc)
 
-        asyncio.create_task(mqtt_watchdog())
         await stop_event.wait()
 
         # ── Arrêt propre ──────────────────────────────────────────────────────
@@ -870,4 +878,8 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except Exception as exc:
+        logger.critical("CRASH FATAL démon: %s", exc, exc_info=True)
+        sys.exit(1)
