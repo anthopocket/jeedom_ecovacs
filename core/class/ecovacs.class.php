@@ -76,6 +76,11 @@ class ecovacs extends eqLogic {
 		if (!is_dir(jeedom::getTmpFolder(__CLASS__))) {
 			mkdir(jeedom::getTmpFolder(__CLASS__), 0775, true);
 		}
+		// Tuer tout processus occupant le port socket avant de démarrer
+		$port_kill = intval(config::byKey('socketport', __CLASS__, 55009));
+		exec("ss -tlnp 2>/dev/null | grep ':{$port_kill}' | grep -oP 'pid=\K[0-9]+' | xargs -r kill -9 2>/dev/null");
+		exec("lsof -ti tcp:{$port_kill} 2>/dev/null | xargs -r kill -9 2>/dev/null");
+		sleep(2);
 		$callback = network::getNetworkAccess('internal', 'htmlfull')
 		          . '/plugins/ecovacs/core/php/ecovacs.inc.php';
 		$cmd  = $python . ' ' . $path . '/ecovacsCmd.py';
