@@ -826,13 +826,12 @@ async def main() -> None:
 
         # ── Watchdog MQTT ─────────────────────────────────────────────────────
         async def mqtt_watchdog():
-            """Vérifie toutes les 5 minutes que MQTT est connecté et rafraîchit."""
+            """Vérifie toutes les 10 minutes que MQTT est connecté."""
             while not stop_event.is_set():
-                await asyncio.sleep(300)  # 5 minutes
+                await asyncio.sleep(600)  # 10 minutes
                 if stop_event.is_set():
                     break
                 try:
-                    # Vérifier si la connexion MQTT est active
                     if hasattr(mqtt_client, '_client') and mqtt_client._client:
                         connected = getattr(mqtt_client._client, 'is_connected', lambda: True)()
                         if not connected:
@@ -840,15 +839,10 @@ async def main() -> None:
                             try:
                                 await mqtt_client.connect()
                                 logger.info("MQTT reconnecté.")
-                                for device in devices.values():
-                                    asyncio.create_task(refresh_device(device))
                             except Exception as exc:
                                 logger.error("Échec reconnexion MQTT : %s", exc)
                         else:
-                            # Rafraîchissement périodique pour garder les données à jour
-                            logger.debug("Watchdog : rafraîchissement périodique")
-                            for device in devices.values():
-                                asyncio.create_task(refresh_device(device))
+                            logger.debug("Watchdog : MQTT OK")
                 except Exception as exc:
                     logger.debug("Watchdog error : %s", exc)
 
